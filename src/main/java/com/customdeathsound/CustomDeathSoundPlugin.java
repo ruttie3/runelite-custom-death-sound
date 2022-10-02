@@ -34,45 +34,56 @@ public class CustomDeathSoundPlugin extends Plugin
 	@Inject
 	private CustomDeathSoundConfig config;
 
+	public boolean isPlaying = false;
+
 	@Subscribe
 	public void onAnimationChanged(AnimationChanged animationChanged)
 	{
-		if (client.getGameState() != GameState.LOGGED_IN
-				|| client.getLocalPlayer() == null
-				|| client.getLocalPlayer().getHealthRatio() != 0
-				|| client.getLocalPlayer().getAnimation() != AnimationID.DEATH
+		// Check if the player died
+		if (client.getGameState() == GameState.LOGGED_IN
+			&& client.getLocalPlayer() != null
+			&& client.getLocalPlayer().getHealthRatio() == 0
+			&& client.getLocalPlayer().getAnimation() == AnimationID.DEATH
 		) {
-			return;
+			playSound();
 		}
-
-		playSound();
 	}
 
 	private void playSound()
 	{
+		// Get the sound file
 		String soundFile = config.soundFile();
 		if (soundFile.length() == 0) {
 			return;
 		}
 
+		// Don't play the clip if we're already playing a clip
+		if (isPlaying) {
+			log.info("Already playing");
+			return;
+		}
+
 		log.info("Playing sound");
 
+		// Close the clip if necessary
 		if (clip != null) {
 			clip.close();
 		}
 
+		// Try to create the input stream
 		AudioInputStream inputStream = null;
 		try {
 			URL url = Paths.get(soundFile).toUri().toURL();
 			inputStream = AudioSystem.getAudioInputStream(url);
 		} catch (UnsupportedAudioFileException | IOException e) {
-			e.printStackTrace();
+			log.warn("Unable to create audio input stream: ", e);
 		}
 
 		if (inputStream == null) {
 			return;
 		}
 
+		// Try to open the clip
 		try
 		{
 			clip = AudioSystem.getClip();
@@ -81,11 +92,22 @@ public class CustomDeathSoundPlugin extends Plugin
 			log.warn("Could not load sound file: ", e);
 		}
 
+		// Set the clip's volume
 		FloatControl volume = (FloatControl) clip.getControl(FloatControl.Type.MASTER_GAIN);
 		float volumeValue = config.volume() - 100;
-
 		volume.setValue(volumeValue);
+
+		// Play the clip
 		clip.loop(0);
+		isPlaying = true;
+
+		// Change isPlaying when the clip has ended
+		clip.addLineListener(e -> {
+			if (e.getType() == LineEvent.Type.STOP) {
+				isPlaying = false;
+				log.info("Done playing sound");
+			}
+		});
 	}
 
 	@Provides
