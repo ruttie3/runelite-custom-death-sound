@@ -2,8 +2,13 @@ package com.customdeathsound;
 
 import com.google.inject.Provides;
 import java.io.File;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadLocalRandom;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.ChatMessageType;
@@ -63,7 +68,7 @@ public class CustomDeathSoundPlugin extends Plugin
 	@Subscribe
 	public void onActorDeath(final ActorDeath event)
 	{
-		if (event.getActor() == client.getLocalPlayer() && config.soundVolume() > 0 && !config.soundFile().isBlank())
+		if (event.getActor() == client.getLocalPlayer() && config.soundVolume() > 0)
 		{
 			playDeathSound = true;
 			sendDebugMessage("Player died.");
@@ -78,7 +83,15 @@ public class CustomDeathSoundPlugin extends Plugin
 			audioDispatcher.execute(() -> {
 				try
 				{
-					final var soundFile = new File(DIRECTORY, config.soundFile());
+					var soundFile = new File(DIRECTORY, config.soundFile());
+					if (soundFile.isDirectory()) {
+						try (final Stream<Path> stream = Files.list(soundFile.toPath())) {
+							final var paths = stream.filter(Files::isRegularFile).collect(Collectors.toList());
+							if (!paths.isEmpty()) {
+								soundFile = paths.get(ThreadLocalRandom.current().nextInt(paths.size())).toFile();
+							}
+						}
+					}
 					final var gain = 20f * (float) Math.log10(config.soundVolume() / 100f);
 					sendDebugMessage("Playing audio file: " + soundFile.getAbsolutePath());
 					audioPlayer.play(soundFile, gain);
