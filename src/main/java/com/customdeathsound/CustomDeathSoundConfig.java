@@ -35,4 +35,15 @@ public interface CustomDeathSoundConfig extends Config
 	{
 		return 100;
 	}
+
+	@ConfigItem(
+		keyName = "debug",
+		name = "Debug",
+		description = "Prints debug information to chatbox.",
+		position = 2
+	)
+	default boolean debug()
+	{
+		return false;
+	}
 }

@@ -6,10 +6,12 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.ChatMessageType;
 import net.runelite.api.Client;
 import net.runelite.api.events.ActorDeath;
 import net.runelite.api.events.ClientTick;
 import static net.runelite.client.RuneLite.RUNELITE_DIR;
+import net.runelite.client.callback.ClientThread;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.plugins.Plugin;
@@ -26,8 +28,11 @@ public class CustomDeathSoundPlugin extends Plugin
 	@Inject
 	private Client client;
 	@Inject
+	private ClientThread clientThread;
+	@Inject
 	private CustomDeathSoundConfig config;
 
+	private static final String DEBUG_PREFIX = "<col=FF0000>[Custom Death Sound]</col> ";
 	private static final File DIRECTORY = new File(RUNELITE_DIR, "custom-death-sound");
 
 	// Inject if merged into RuneLite
@@ -61,6 +66,7 @@ public class CustomDeathSoundPlugin extends Plugin
 		if (event.getActor() == client.getLocalPlayer() && config.soundVolume() > 0 && !config.soundFile().isBlank())
 		{
 			playDeathSound = true;
+			sendDebugMessage("Player died.");
 		}
 	}
 
@@ -74,15 +80,26 @@ public class CustomDeathSoundPlugin extends Plugin
 				{
 					final var soundFile = new File(DIRECTORY, config.soundFile());
 					final var gain = 20f * (float) Math.log10(config.soundVolume() / 100f);
+					sendDebugMessage("Playing audio file: " + soundFile.getAbsolutePath());
 					audioPlayer.play(soundFile, gain);
 				}
 				catch (final Exception e)
 				{
 					log.warn("play audio {}", config.soundFile(), e);
+					sendDebugMessage("There was an error playing the audio file: " + config.soundFile());
 				}
 			});
 
 			playDeathSound = false;
+		}
+	}
+
+	private void sendDebugMessage(final String msg) {
+		if (config.debug())
+		{
+			clientThread.invoke(() -> {
+				client.addChatMessage(ChatMessageType.GAMEMESSAGE, "", DEBUG_PREFIX + msg, "custom-death-sound", false);
+			});
 		}
 	}
 }
